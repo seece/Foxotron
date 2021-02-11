@@ -13,6 +13,8 @@
 #include <glm.hpp>
 #include <common.hpp>
 
+#define DESPERATE_TEXTURE_TYPE_HACK 1
+
 #ifdef min
 #undef min
 #endif
@@ -354,6 +356,26 @@ bool Geometry::LoadMesh( const char * _path )
     {
       material.mTextureAO = LoadTexture( "ao", str, folder );
     }
+
+    #if DESPERATE_TEXTURE_TYPE_HACK
+
+    if ( !material.mTextureAO )
+    {
+      if ( aiGetMaterialString( scene->mMaterials[ i ], AI_MATKEY_TEXTURE( aiTextureType_AMBIENT, 0 ), &str ) == AI_SUCCESS )
+      {
+        material.mTextureAO = LoadTexture( "ao", str, folder );
+      }
+    }
+
+    if ( !material.mTextureRoughness )
+    {
+      if ( aiGetMaterialString( scene->mMaterials[ i ], AI_MATKEY_TEXTURE( aiTextureType_EMISSIVE, 0 ), &str ) == AI_SUCCESS )
+      {
+        material.mTextureRoughness = LoadTexture( "roughness", str, folder );
+      }
+    }
+
+    #endif
 
     float f = 0.0f;
 
