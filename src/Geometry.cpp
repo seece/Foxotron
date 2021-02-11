@@ -321,6 +321,36 @@ bool Geometry::LoadMesh( const char * _path )
     material.mName = std::string( str.data, str.length );
     printf( "[geometry] Loading material #%d: '%s'\n", i + 1, material.mName.c_str() );
 
+    const char* textureTypeNames[] = {
+        "none",
+        "diffuse",
+        "specular",
+        "ambient",
+        "emissive",
+        "height",
+        "normals",
+        "shininess",
+        "opacity",
+        "displacement",
+        "lightmap",
+        "reflection",
+        "base_color",
+        "normal_camera",
+        "emission_color",
+        "metalness",
+        "diffuse_roughness",
+        "ambient_occlusion",
+        "unknown",
+    };
+
+    for ( int type = 0; type <= AI_TEXTURE_TYPE_MAX; type++ ) {
+      auto result = aiGetMaterialString( scene->mMaterials[ i ], AI_MATKEY_TEXTURE( type, 0 ), &str );
+      if ( result == AI_SUCCESS )
+      {
+        printf( "[geometry] Found %s: '%s'\n", textureTypeNames[ type ], str.data );
+      }
+    }
+
     material.mTextureDiffuse = NULL;
     if ( aiGetMaterialString( scene->mMaterials[ i ], AI_MATKEY_TEXTURE( aiTextureType_DIFFUSE, 0 ), &str ) == AI_SUCCESS )
     {
