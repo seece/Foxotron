@@ -485,21 +485,100 @@ void Geometry::UnloadMesh()
   gImporter.FreeScene();
 }
 
+static bool materialIsTransparent( const Geometry::Material & mat )
+{
+  if ( mat.mColorMapDiffuse.mTexture && mat.mColorMapDiffuse.mTexture->mTransparent )
+    return true;
+  if ( mat.mColorMapAlbedo.mTexture && mat.mColorMapAlbedo.mTexture->mTransparent )
+    return true;
+  return false;
+}
+
 void Geometry::Render( const glm::mat4x4 & _worldRootMatrix, Renderer::Shader * _shader )
 {
   Renderer::SetShader( _shader );
 
-  _shader->SetConstant( "global_ambient", mGlobalAmbient );
-  for ( std::map<int, Geometry::Node>::iterator it = mNodes.begin(); it != mNodes.end(); it++ )
+  // Sort transparent nodes and meshes last and draw them with blending enabled.
+
+  std::map<int, bool> isMeshTransparent;
+  std::map<int, bool> isNodeTransparent;
+
+  for ( const auto& pair : mMeshes )
   {
-    const Geometry::Node & node = it->second;
+    isMeshTransparent[ pair.first ] = materialIsTransparent( mMaterials[ pair.second.mMaterialIndex ] );
+  }
+
+  for ( const auto& pair : mNodes )
+  {
+    isNodeTransparent[ pair.first ] = false;
+
+    for ( auto meshIndex : pair.second.mMeshes )
+    {
+      if ( isMeshTransparent[ meshIndex ] )
+      {
+        isNodeTransparent[ pair.first ] = true;
+        break;
+      }
+    }
+  }
+
+  for ( auto& pair : mNodes )
+  {
+    auto& node = pair.second;
+    std::sort( node.mMeshes.begin(), node.mMeshes.end(),
+      [&isMeshTransparent]( int a, int b ) {
+        bool at = isMeshTransparent[ a ];
+        bool bt = isMeshTransparent[ b ];
+        if ( at == bt )
+          return a < b;
+        if ( !at ) // opaque first
+          return true;
+        return false;
+      } );
+  }
+
+  std::vector<int> sortedNodes;
+  sortedNodes.reserve( mNodes.size() );
+  for ( const auto& pair : mNodes )
+  {
+    sortedNodes.push_back( pair.first );
+  }
+
+  std::sort( sortedNodes.begin(), sortedNodes.end(),
+    [&isNodeTransparent]( int a, int b ) {
+      bool at = isNodeTransparent[ a ];
+      bool bt = isNodeTransparent[ b ];
+      if ( at == bt )
+        return a < b;
+      if ( !at ) // opaque first
+        return true;
+      return false;
+    } );
+
+  // TODO Should depth sort nodes AND models based on transformed (Node::transform) bounding boxes (Mesh::mAABBMin)
+
+  _shader->SetConstant( "global_ambient", mGlobalAmbient );
+  for ( int nodeIndex : sortedNodes )
+  {
+    const Geometry::Node& node = mNodes[ nodeIndex ];
 
     _shader->SetConstant( "mat_world", mMatrices[ node.mID ] * _worldRootMatrix );
 
-    for ( int i = 0; i < it->second.mMeshes.size(); i++ )
+    for ( int i = 0; i < node.mMeshes.size(); i++ )
     {
-      const Geometry::Mesh & mesh = mMeshes[ it->second.mMeshes[ i ] ];
+      const Geometry::Mesh & mesh = mMeshes[ node.mMeshes[ i ] ];
       const Geometry::Material & material = mMaterials[ mesh.mMaterialIndex ];
+
+      const bool blending = isMeshTransparent[ node.mMeshes[ i ] ];
+
+      if ( blending )
+      {
+        puts( "blending" );
+        glEnable( GL_BLEND );
+        glBlendEquation( GL_FUNC_ADD );
+        glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
+        glDepthMask( GL_FALSE ); // disable depth writes for blended meshes
+      }
 
       _shader->SetConstant( "specular_shininess", material.mSpecularShininess );
 
@@ -515,6 +594,12 @@ void Geometry::Render( const glm::mat4x4 & _worldRootMatrix, Renderer::Shader * 
       glBindVertexArray( mesh.mVertexArrayObject );
 
       glDrawElements( GL_TRIANGLES, mesh.mTriangleCount * 3, GL_UNSIGNED_INT, NULL );
+
+      if ( blending )
+      {
+        glDepthMask( GL_TRUE );
+        glDisable( GL_BLEND );
+      }
     }
   }
 }

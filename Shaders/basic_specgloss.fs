@@ -94,7 +94,7 @@ float calculate_specular( vec3 normal, vec3 light_direction )
 void main(void)
 {
   vec3 ambient = sample_colormap( map_ambient, out_texcoord ).xyz;
-  vec3 diffusemap = sample_colormap( map_diffuse, out_texcoord ).xyz;
+  vec4 diffusemap = sample_colormap( map_diffuse, out_texcoord );
   vec3 normalmap = normalize(texture( map_normals.tex, out_texcoord ).xyz * vec3(2.0) - vec3(1.0));
   vec4 specularmap = sample_colormap( map_specular, out_texcoord );
 
@@ -118,8 +118,8 @@ void main(void)
     float ndotl = clamp( dot( normal, -normalize( lights[ i ].direction ) ), 0.0, 1.0 );
 
     vec3 specular = specularmap.rgb * calculate_specular( normal, lights[ i ].direction ) * specularmap.a;
-    color += (diffusemap + specular) * ndotl * lights[ i ].color;
+    color += (diffusemap.rgb + specular) * ndotl * lights[ i ].color;
   }
 
-  frag_color = vec4( pow( color * exposure, vec3(1. / 2.2) ), 1.0f );
+  frag_color = vec4( pow( color * exposure, vec3(1. / 2.2) ), diffusemap.a );
 }

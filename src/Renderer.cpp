@@ -418,6 +418,7 @@ Texture * CreateRGBA8TextureFromFile( const char * szFilename, const bool _loadA
   tex->mFilename = szFilename;
   tex->mGLTextureID = glTexId;
   tex->mGLTextureUnit = textureUnit++;
+  tex->mTransparent = comp == 4; // TODO should check here if alpha is all 1.0 and set mTransparent=false if that's the case
   return tex;
 }
 
